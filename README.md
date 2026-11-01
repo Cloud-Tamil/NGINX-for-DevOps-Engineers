@@ -1,4 +1,4 @@
-# NGINX for DevOps Engineers
+# NGINX 
 
 > A practical, end-to-end guide to learning NGINX—from your first static website to reverse proxies, load balancing, HTTPS, Docker, Kubernetes, security, troubleshooting, and production architecture.
 
