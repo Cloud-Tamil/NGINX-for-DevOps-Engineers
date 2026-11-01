@@ -322,21 +322,369 @@ Common directives include:
 
 ### Lab 1: Host a static website
 
-Create a document root and a test page:
-
 ```bash
 sudo mkdir -p /var/www/mywebsite
 sudo tee /var/www/mywebsite/index.html > /dev/null <<'HTML'
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>My NGINX Project</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calculator</title>
+<style>
+:root{
+  color-scheme: light dark;
+  --desk:#dde4df; --ink:#17201c; --muted:#53625a;
+  --paper:#f3f5f1; --paper-ink:#25302b; --paper-line:#b9c3bc;
+  --body:#222b29; --lcd:#c3d1bf; --lcd-ink:#1b251f;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --desk:#0f1413; --ink:#e6ece8; --muted:#93a49b; }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--desk);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.wrap{display:grid;grid-template-columns:minmax(300px,380px) minmax(240px,320px);gap:28px;justify-content:center;align-items:start;padding:32px 20px}
+@media (max-width:720px){.wrap{grid-template-columns:minmax(0,420px);padding:16px 12px}}
+
+.calc{background:var(--body);border-radius:22px;padding:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 24px 40px -22px rgba(0,0,0,.5)}
+.screen{background:var(--lcd);color:var(--lcd-ink);border-radius:12px;padding:10px 14px 12px;box-shadow:inset 0 2px 6px rgba(0,0,0,.28)}
+.screen-top{display:flex;justify-content:space-between;align-items:center;min-height:28px}
+.chip{font:inherit;font-size:.8rem;padding:3px 10px;border-radius:999px;border:1px solid rgba(27,37,31,.45);background:transparent;color:inherit;cursor:pointer}
+.chip[aria-expanded="true"]{background:var(--lcd-ink);color:var(--lcd)}
+.expr{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:1rem;min-height:1.5em;text-align:right;white-space:nowrap;overflow-x:auto;scrollbar-width:none;opacity:.8}
+.expr::-webkit-scrollbar{display:none}
+.big{display:block;font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:2.9rem;line-height:1.2;text-align:right;white-space:nowrap;overflow:hidden;font-weight:500}
+.big.err{font-family:system-ui,sans-serif;font-weight:500;line-height:2.6rem}
+
+.keys{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+.keys[hidden]{display:none}
+.keys button{height:56px;border:0;border-radius:12px;font:inherit;font-size:1.25rem;cursor:pointer;box-shadow:0 2px 0 rgba(0,0,0,.4);transition:transform .06s,box-shadow .06s}
+.keys button:active{transform:translateY(2px);box-shadow:none}
+.keys button:focus-visible,.chip:focus-visible,.tape button:focus-visible{outline:3px solid #f0b429;outline-offset:2px}
+.k-num{background:#e8ece6;color:#1b251f}
+.k-fn{background:#3a4947;color:#e8ece6}
+.k-op{background:#4d7069;color:#fff}
+.k-clear{background:#b4534a;color:#fff}
+.k-eq{background:#f0b429;color:#2a2000;grid-column:span 4;font-weight:600}
+.keys.sci button{height:44px;font-size:1rem;background:#2f3b39;color:#c9d9d3}
+.keys.sci .k-mode{background:#4d7069;color:#fff}
+
+.tape{background:var(--paper);color:var(--paper-ink);border-radius:6px 6px 0 0;padding:14px 14px 8px;box-shadow:0 14px 28px -20px rgba(0,0,0,.5)}
+.tape-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.tape-head h2{margin:0;font-size:1rem;font-weight:600}
+.tape-head button{font:inherit;font-size:.85rem;background:none;border:0;color:#2f5a52;text-decoration:underline;cursor:pointer;padding:4px}
+.tape ul{list-style:none;margin:0;padding:0;max-height:62vh;overflow:auto}
+.tape li button{display:block;width:100%;text-align:right;background:none;border:0;border-bottom:1px dashed var(--paper-line);padding:8px 2px;cursor:pointer;color:inherit;font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+.tape li button:hover{background:rgba(0,0,0,.05)}
+.te{display:block;font-size:.85rem;color:#566159;overflow-wrap:anywhere}
+.tr{display:block;font-size:1.15rem;font-weight:600;overflow-wrap:anywhere}
+.empty{margin:8px 0 14px;font-size:.9rem;color:#566159;line-height:1.5}
+@media (prefers-reduced-motion:reduce){.keys button{transition:none}}
+</style>
 </head>
 <body>
-  <h1>Hello from NGINX!</h1>
-  <p>My first DevOps web server project.</p>
+<h1 class="sr">Calculator</h1>
+<main class="wrap">
+  <section class="calc" aria-label="Calculator">
+    <div class="screen">
+      <div class="screen-top">
+        <button id="sci" class="chip" type="button" aria-expanded="false" aria-controls="scikeys">Scientific</button>
+      </div>
+      <div id="expr" class="expr" aria-label="Expression"></div>
+      <output id="big" class="big" aria-live="polite">0</output>
+    </div>
+    <div id="scikeys" class="keys sci" hidden></div>
+    <div id="keys" class="keys"></div>
+  </section>
+
+  <aside class="tape" aria-label="Calculation history">
+    <div class="tape-head">
+      <h2>Tape</h2>
+      <button id="clearTape" type="button">Clear tape</button>
+    </div>
+    <p id="empty" class="empty">Results you calculate appear here. Select one to use it again.</p>
+    <ul id="tapeList"></ul>
+  </aside>
+</main>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const exprEl = $('#expr'), big = $('#big');
+  const FUNCS = ['asin','acos','atan','sin','cos','tan','ln','log','abs','√'];
+  const OPS = '+−×÷^';
+  const POST = /[\d)πe%!²]$/;
+  const STORE = 'calc.tape.v1';
+
+  let expr = '', fresh = false, deg = true, lastGood = '0', tape = [];
+  try { tape = JSON.parse(localStorage.getItem(STORE)) || []; } catch (e) { tape = []; }
+
+  /* ---------- parser (no eval) ---------- */
+  function tokenize(s) {
+    const re = /(\d+\.?\d*(?:e[+-]?\d+)?|\.\d+(?:e[+-]?\d+)?|asin|acos|atan|sin|cos|tan|ln|log|abs|√|π|e|[+\-−×÷*\/^!%²()])/y;
+    const out = [];
+    while (re.lastIndex < s.length) {
+      const m = re.exec(s);
+      if (!m) throw new Error('Unexpected input');
+      out.push(m[1]);
+    }
+    return out;
+  }
+  const close = s => s + ')'.repeat(Math.max(0, (s.match(/\(/g) || []).length - (s.match(/\)/g) || []).length));
+  const rad = v => deg ? v * Math.PI / 180 : v;
+  const back = v => deg ? v * 180 / Math.PI : v;
+  const snap = v => Math.abs(v) < 1e-12 ? 0 : v;
+
+  function fact(v) {
+    if (!Number.isInteger(v) || v < 0 || v > 170) throw new Error('Factorial needs a whole number from 0 to 170');
+    let r = 1; for (let k = 2; k <= v; k++) r *= k; return r;
+  }
+  function fn(n, v) {
+    switch (n) {
+      case 'sin': return snap(Math.sin(rad(v)));
+      case 'cos': return snap(Math.cos(rad(v)));
+      case 'tan':
+        if (deg && Math.abs((((v % 180) + 180) % 180) - 90) < 1e-9) throw new Error('Tangent is undefined here');
+        return snap(Math.tan(rad(v)));
+      case 'asin': if (Math.abs(v) > 1) throw new Error('Enter a value from −1 to 1'); return back(Math.asin(v));
+      case 'acos': if (Math.abs(v) > 1) throw new Error('Enter a value from −1 to 1'); return back(Math.acos(v));
+      case 'atan': return back(Math.atan(v));
+      case 'ln':   if (v <= 0) throw new Error('ln needs a positive number'); return Math.log(v);
+      case 'log':  if (v <= 0) throw new Error('log needs a positive number'); return Math.log10(v);
+      case 'abs':  return Math.abs(v);
+      case '√':    if (v < 0) throw new Error('Square root needs a non-negative number'); return Math.sqrt(v);
+    }
+  }
+
+  function evaluate(src) {
+    const t = tokenize(close(src));
+    let i = 0;
+    const peek = () => t[i], next = () => t[i++];
+    const starts = x => x !== undefined && (/^[\d.]/.test(x) || x === '(' || x === 'π' || x === 'e' || FUNCS.includes(x));
+
+    function sum() {
+      let v = term();
+      while (peek() === '+' || peek() === '-' || peek() === '−') {
+        const o = next(), r = term();
+        v = o === '+' ? v + r : v - r;
+      }
+      return v;
+    }
+    function term() {
+      let v = unary();
+      for (;;) {
+        const p = peek();
+        if (p === '×' || p === '*') { next(); v *= unary(); }
+        else if (p === '÷' || p === '/') { next(); const d = unary(); if (d === 0) throw new Error("Can't divide by zero"); v /= d; }
+        else if (starts(p)) { v *= unary(); }
+        else break;
+      }
+      return v;
+    }
+    function unary() {
+      const p = peek();
+      if (p === '-' || p === '−') { next(); return -unary(); }
+      if (p === '+') { next(); return unary(); }
+      return power();
+    }
+    function power() {
+      const b = postfix();
+      if (peek() === '^') { next(); return Math.pow(b, unary()); }
+      return b;
+    }
+    function postfix() {
+      let v = primary();
+      for (;;) {
+        const p = peek();
+        if (p === '!') { next(); v = fact(v); }
+        else if (p === '%') { next(); v /= 100; }
+        else if (p === '²') { next(); v *= v; }
+        else break;
+      }
+      return v;
+    }
+    function primary() {
+      const x = next();
+      if (x === undefined) throw new Error('Incomplete expression');
+      if (x === '(') { const v = sum(); if (next() !== ')') throw new Error('Missing )'); return v; }
+      if (x === 'π') return Math.PI;
+      if (x === 'e') return Math.E;
+      if (FUNCS.includes(x)) {
+        if (next() !== '(') throw new Error('Use brackets after ' + x);
+        const v = sum(); if (next() !== ')') throw new Error('Missing )');
+        return fn(x, v);
+      }
+      if (/^[\d.]/.test(x)) return parseFloat(x);
+      throw new Error('Unexpected ' + x);
+    }
+
+    const r = sum();
+    if (i < t.length) throw new Error('Unexpected ' + t[i]);
+    if (Number.isNaN(r)) throw new Error('Not a number');
+    if (!Number.isFinite(r)) throw new Error('Result is too large');
+    return r;
+  }
+  const fmt = n => String(parseFloat(n.toPrecision(12)));
+
+  /* ---------- display ---------- */
+  function setBig(val) {
+    const t = val.replace(/-/g, '−');
+    big.classList.remove('err');
+    big.textContent = t;
+    big.style.fontSize = Math.max(1.5, 2.9 - Math.max(0, t.length - 9) * 0.14) + 'rem';
+  }
+  function showError(msg) {
+    big.classList.add('err');
+    big.textContent = msg;
+    big.style.fontSize = '1.05rem';
+  }
+  function render() {
+    exprEl.textContent = expr.replace(/-/g, '−');
+    exprEl.scrollLeft = exprEl.scrollWidth;
+    let val = '0';
+    if (expr) { try { val = fmt(evaluate(expr)); } catch (e) { val = lastGood; } }
+    lastGood = val;
+    setBig(val);
+  }
+
+  /* ---------- input ---------- */
+  function put(tok) {
+    const cont = '+−×÷^!%²)'.includes(tok);
+    if (fresh) { if (!cont) expr = ''; fresh = false; }
+    const last = expr.slice(-1);
+
+    if (OPS.includes(tok)) {
+      if (!expr) { if (tok === '−') expr = '−'; return render(); }
+      if (/[+−×÷^]$/.test(expr)) {
+        if (tok === '−' && /[×÷^]$/.test(expr)) expr += tok;
+        else { const base = expr.replace(/[+−×÷^]+$/, ''); expr = base ? base + tok : (tok === '−' ? tok : ''); }
+      } else if (last === '(') { if (tok === '−') expr += tok; }
+      else expr += tok;
+      return render();
+    }
+    if ('!%²'.includes(tok)) { if (POST.test(expr)) expr += tok; return render(); }
+    if (tok === ')') {
+      const open = (expr.match(/\(/g) || []).length - (expr.match(/\)/g) || []).length;
+      if (open > 0 && POST.test(expr)) expr += tok;
+      return render();
+    }
+    if (tok === '.') {
+      const seg = expr.match(/[\d.]*$/)[0];
+      if (seg.includes('.')) return;
+      if (!seg) tok = '0.';
+    }
+    if (tok === 'e' && /[\d.]$/.test(expr)) tok = '×e';
+    expr += tok;
+    render();
+  }
+  function backspace() {
+    expr = expr.replace(/(asin|acos|atan|sin|cos|tan|ln|log|abs|√)\($|.$/, '');
+    fresh = false;
+    render();
+  }
+  function clearAll() { expr = ''; fresh = false; lastGood = '0'; render(); }
+  function equals() {
+    if (!expr) return;
+    try {
+      const closed = close(expr);
+      const res = fmt(evaluate(expr));
+      if (res !== closed) addTape(closed, res);
+      expr = res; fresh = true;
+      render();
+    } catch (e) { showError(e.message); }
+  }
+
+  /* ---------- tape ---------- */
+  function saveTape() { try { localStorage.setItem(STORE, JSON.stringify(tape)); } catch (e) {} }
+  function addTape(e, r) { tape.unshift({ e, r }); tape = tape.slice(0, 50); saveTape(); drawTape(); }
+  function drawTape() {
+    const ul = $('#tapeList');
+    ul.textContent = '';
+    $('#empty').hidden = tape.length > 0;
+    tape.forEach(item => {
+      const li = document.createElement('li');
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.title = 'Use ' + item.r.replace(/-/g, '−');
+      const a = document.createElement('span'); a.className = 'te'; a.textContent = item.e.replace(/-/g, '−');
+      const c = document.createElement('span'); c.className = 'tr'; c.textContent = '= ' + item.r.replace(/-/g, '−');
+      b.append(a, c);
+      b.addEventListener('click', () => { expr = item.r; fresh = true; render(); });
+      li.appendChild(b);
+      ul.appendChild(li);
+    });
+  }
+  $('#clearTape').addEventListener('click', () => { tape = []; saveTape(); drawTape(); });
+
+  /* ---------- keys ---------- */
+  const MAIN = [
+    ['AC','clear','k-clear'], ['⌫','back','k-fn'], ['%','%','k-fn'], ['÷','÷','k-op'],
+    ['7'], ['8'], ['9'], ['×','×','k-op'],
+    ['4'], ['5'], ['6'], ['−','−','k-op'],
+    ['1'], ['2'], ['3'], ['+','+','k-op'],
+    ['(','(','k-fn'], ['0'], ['.'], [')',')','k-fn'],
+    ['=','eq','k-eq']
+  ];
+  const SCI = [
+    ['sin','sin('], ['cos','cos('], ['tan','tan('], ['Deg','mode','k-mode'],
+    ['sin⁻¹','asin('], ['cos⁻¹','acos('], ['tan⁻¹','atan('], ['π','π'],
+    ['ln','ln('], ['log','log('], ['√','√('], ['e','e'],
+    ['x²','²'], ['xʸ','^'], ['n!','!'], ['|x|','abs(']
+  ];
+  const LABELS = { back:'Backspace', clear:'All clear', eq:'Equals', '÷':'Divide', '×':'Multiply', '−':'Subtract', '+':'Add', mode:'Toggle degrees and radians' };
+
+  function build(host, defs, sci) {
+    defs.forEach(([label, key = label, cls = sci ? '' : 'k-num']) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = label; b.dataset.k = key; b.className = cls;
+      if (LABELS[key]) b.setAttribute('aria-label', LABELS[key]);
+      host.appendChild(b);
+    });
+    host.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      const k = b.dataset.k;
+      if (k === 'clear') clearAll();
+      else if (k === 'back') backspace();
+      else if (k === 'eq') equals();
+      else if (k === 'mode') { deg = !deg; b.textContent = deg ? 'Deg' : 'Rad'; render(); }
+      else put(k);
+    });
+  }
+  build($('#keys'), MAIN, false);
+  build($('#scikeys'), SCI, true);
+
+  const sciBtn = $('#sci'), sciKeys = $('#scikeys');
+  sciBtn.addEventListener('click', () => {
+    const open = sciKeys.hidden;
+    sciKeys.hidden = !open;
+    sciBtn.setAttribute('aria-expanded', String(open));
+  });
+
+  /* ---------- keyboard ---------- */
+  document.addEventListener('keydown', e => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.target.closest && e.target.closest('.tape')) return;
+    const k = e.key;
+    if (/^[0-9.()%!^]$/.test(k)) put(k);
+    else if (k === '+') put('+');
+    else if (k === '-') put('−');
+    else if (k === '*' || k === 'x' || k === 'X') put('×');
+    else if (k === '/') put('÷');
+    else if (k === 'p' || k === 'P') put('π');
+    else if (k === 'e') put('e');
+    else if (k === 'Enter' || k === '=') equals();
+    else if (k === 'Backspace') backspace();
+    else if (k === 'Escape') clearAll();
+    else return;
+    e.preventDefault();
+  });
+
+  drawTape();
+  render();
+})();
+</script>
 </body>
 </html>
 HTML
