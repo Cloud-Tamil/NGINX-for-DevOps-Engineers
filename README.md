@@ -239,7 +239,14 @@ Find the machine's IP address:
 ```bash
 hostname -I
 ```
-
+```bash
+sudo nano /etc/nginx/sites-available/default
+```
+Change 80 to 8080:
+```bash
+listen 80 default_server;
+listen [::]:80 default_server;
+```
 Then visit `http://YOUR_UBUNTU_IP` in a browser.
 
 ## Important files and directories
