@@ -246,6 +246,8 @@ Change 80 to 8080:
 ```bash
 listen 80 default_server;
 listen [::]:80 default_server;
+
+sudo service nginx restart
 ```
 Then visit `http://YOUR_UBUNTU_IP` in a browser.
 
